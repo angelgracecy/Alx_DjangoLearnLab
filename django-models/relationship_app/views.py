@@ -115,3 +115,6 @@ from django.contrib.auth.decorators import permission_required
 from django.shortcuts import render, get_object_or_404, redirect
 from .models import Book
 
+relationship_app.can_add_book
+relationship_app.can_change_book
+relationship_app.can_delete_book
