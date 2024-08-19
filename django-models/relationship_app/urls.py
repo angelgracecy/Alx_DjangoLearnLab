@@ -22,7 +22,7 @@ urlpatterns = [
 ]
 
 from django.urls import path
-from .views import add_book, edit_book, delete_book
+from .views import add_book/, edit_book/, delete_book
 
 urlpatterns = [
     path('add/', add_book, name='add_book'),
