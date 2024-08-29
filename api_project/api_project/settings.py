@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     'api',
     'rest_framework.authtoken',
     'DEFAULT_AUTHENTICATION_CLASSES',
+    'rest_framework.authentication.TokenAuthentication',
 ]
 
 MIDDLEWARE = [
