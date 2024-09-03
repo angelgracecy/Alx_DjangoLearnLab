@@ -4,6 +4,7 @@ from .serializers import BookSerializer
 from django_filters import rest_framework
 
 filters.OrderingFilter
+filters.SearchFilter
 
 # ListView for retrieving all books
 class BookListView(generics.ListAPIView):
