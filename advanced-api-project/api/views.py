@@ -5,6 +5,7 @@ from django_filters import rest_framework
 
 filters.OrderingFilter
 filters.SearchFilter
+"title", "author", "publication_year"
 
 # ListView for retrieving all books
 class BookListView(generics.ListAPIView):
