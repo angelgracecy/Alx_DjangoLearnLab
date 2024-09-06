@@ -1,85 +1,95 @@
 from django.urls import reverse
 from rest_framework import status
-from rest_framework.test import APITestCase
-from .models import Book, Author
+from rest_framework.test import APITestCase, APIClient
+from api.models import Book, Author
 from django.contrib.auth.models import User
 
 class BookAPITests(APITestCase):
-
     def setUp(self):
-        # Create a user for authentication
-        self.user = User.objects.create_user(username='testuser', password='testpassword')
-
-        # Create an author
-        self.author = Author.objects.create(name="John Doe")
-
-        # Create a book
-        self.book = Book.objects.create(title="Sample Book", publication_year=2023, author=self.author)
-
-    def test_create_book(self):
-        """Test creating a new book"""
-        self.client.login(username='testuser', password='testpassword')
-        url = reverse('book-create')
-        data = {
-            "title": "New Book",
-            "publication_year": 2024,
-            "author": self.author.id
+        self.client = APIClient()
+        self.user = User.objects.create_user(username='testuser', password='testpass')
+        self.author = Author.objects.create(name='Test Author')
+        self.book = Book.objects.create(title='Test Book', author=self.author, isbn='1234567890')
+        self.book_data = {
+            'title': 'New Book',
+            'author': self.author.id,
+            'isbn': '0987654321'
         }
-        response = self.client.post(url, data, format='json')
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(Book.objects.count(), 2)
-        self.assertEqual(Book.objects.get(id=response.data['id']).title, "New Book")
 
     def test_get_book_list(self):
-        """Test retrieving a list of books"""
         url = reverse('book-list')
-        response = self.client.get(url, format='json')
+        response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data), 1)
 
     def test_get_book_detail(self):
-        """Test retrieving a single book by ID"""
         url = reverse('book-detail', kwargs={'pk': self.book.id})
-        response = self.client.get(url, format='json')
+        response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data['title'], self.book.title)
+        self.assertEqual(response.data['title'], 'Test Book')
+
+    def test_create_book(self):
+        url = reverse('book-list')
+        self.client.force_authenticate(user=self.user)
+        response = self.client.post(url, self.book_data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(Book.objects.count(), 2)
 
     def test_update_book(self):
-        """Test updating a book"""
-        self.client.login(username='testuser', password='testpassword')
-        url = reverse('book-update', kwargs={'pk': self.book.id})
-        data = {
-            "title": "Updated Book",
-            "publication_year": 2023,
-            "author": self.author.id
-        }
-        response = self.client.put(url, data, format='json')
+        url = reverse('book-detail', kwargs={'pk': self.book.id})
+        self.client.force_authenticate(user=self.user)
+        updated_data = {'title': 'Updated Book', 'author': self.author.id, 'isbn': '1111111111'}
+        response = self.client.put(url, updated_data, format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(Book.objects.get(id=self.book.id).title, "Updated Book")
+        self.book.refresh_from_db()
+        self.assertEqual(self.book.title, 'Updated Book')
 
     def test_delete_book(self):
-        """Test deleting a book"""
-        self.client.login(username='testuser', password='testpassword')
-        url = reverse('book-delete', kwargs={'pk': self.book.id})
+        url = reverse('book-detail', kwargs={'pk': self.book.id})
+        self.client.force_authenticate(user=self.user)
         response = self.client.delete(url)
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertEqual(Book.objects.count(), 0)
 
-    def test_permissions(self):
-        """Test that unauthenticated users cannot create, update, or delete books"""
-        create_url = reverse('book-create')
-        update_url = reverse('book-update', kwargs={'pk': self.book.id})
-        delete_url = reverse('book-delete', kwargs={'pk': self.book.id})
+    def test_search_books(self):
+        another_author = Author.objects.create(name='Another Author')
+        Book.objects.create(title='Another Book', author=another_author, isbn='9876543210')
+        url = reverse('book-list') + '?search=Another'
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]['title'], 'Another Book')
 
-        # Unauthenticated create attempt
-        response = self.client.post(create_url, {}, format='json')
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+    def test_filter_books(self):
+        python_author = Author.objects.create(name='Python Author')
+        Book.objects.create(title='Python Book', author=python_author, isbn='1111111111')
+        url = reverse('book-list') + f'?author={python_author.id}'
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]['title'], 'Python Book')
 
-        # Unauthenticated update attempt
-        response = self.client.put(update_url, {}, format='json')
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+    def test_order_books(self):
+        another_author = Author.objects.create(name='A Author')
+        Book.objects.create(title='A Book', author=another_author, isbn='2222222222')
+        url = reverse('book-list') + '?ordering=title'
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 2)
+        self.assertEqual(response.data[0]['title'], 'A Book')
+        self.assertEqual(response.data[1]['title'], 'Test Book')
 
-        # Unauthenticated delete attempt
-        response = self.client.delete(delete_url)
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+    def test_unauthenticated_create(self):
+        url = reverse('book-list')
+        response = self.client.post(url, self.book_data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
+    def test_unauthenticated_update(self):
+        url = reverse('book-detail', kwargs={'pk': self.book.id})
+        response = self.client.put(url, self.book_data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_unauthenticated_delete(self):
+        url = reverse('book-detail', kwargs={'pk': self.book.id})
+        response = self.client.delete(url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
