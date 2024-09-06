@@ -93,3 +93,5 @@ class BookAPITests(APITestCase):
         url = reverse('book-detail', kwargs={'pk': self.book.id})
         response = self.client.delete(url)
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+        self.client.login
