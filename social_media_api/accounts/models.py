@@ -12,5 +12,3 @@ class CustomUser(AbstractUser):
     def __str__(self):
         return self.username
 
-
-    Create a custom user model that extends Django’s AbstractUser, adding fields such as bio, profile_picture, and followers (a ManyToMany field referencing itself, symmetrical=False).” task
